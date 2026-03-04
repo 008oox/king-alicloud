@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: king-deployment
+  namespace: ts
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-demo
+      version: v1.0
+  template:
+    metadata:
+      labels:
+        app: nginx-demo
+        version: v1.0
+      annotations: 
+        rollout-timestamp: "xxxxxxx"
+    spec:
+      serviceAccountName: king
+      containers:
+      - name: nginx
+        image: nexus3.xxx.xxx:18080/xxxxxxxx/nginx:1.1.0
+        workingDir: /tmp
+        command:
+        - /bin/sh
+        - -c
+        - |
+          nginx -g 'daemon off;' -c /etc/nginx/conf.d/host.conf
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        volumeMounts:
+        - name: log-volume
+          mountPath: /var/log
+        - name: tmp-volume
+          mountPath: /tmp
+        - name: nginx-config-volume
+          mountPath: /etc/nginx/conf.d/host.conf
+          subPath: host.conf
+      volumes:
+      - name: log-volume
+        emptyDir: {}
+      - name: tmp-volume
+        emptyDir: {}
+      - name: nginx-config-volume
+        configMap:
+          name: nginx-config
+          items:
+          - key: host.conf
+            path: host.conf

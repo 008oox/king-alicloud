@@ -1,0 +1,120 @@
+
+
+pipeline {
+    environment {
+        REGION = "cn-shanghai-d"
+    }
+
+    agent { node { label 'cm-linux'} }
+
+    options {
+        timeout(time: 1, unit: 'HOURS')
+        ansiColor('xterm')
+        withFolderProperties()
+        timestamps()
+        disableConcurrentBuilds()
+    }
+
+    parameters {
+        string(name: 'TARGET_VERSION', defaultValue: 'v2.0', description: '')
+        string(name: 'TAG', defaultValue: 'latest', description: '')
+        string(name: 'APP_NAME', defaultValue: 'nginx-demo', description: '')
+        string(name: 'NAMESPACE', defaultValue: 'ts', description: '')
+        string(name: 'SERVICE_NAME', defaultValue: 'king-service', description: '')
+        string(name: 'ACTION', defaultValue: 'dry-run', description: '')
+    }
+
+    stages {
+        stage('get Active Version') {
+            steps {
+                script {
+                    env.CURRENT_VERSION = sh(
+                        script: "kubectl get svc ${params.SERVICE_NAME} -n ${params.NAMESPACE} -o jsonpath='{.spec.selector.version}'",
+                        returnStdout: true
+                    ).trim()
+
+                    env.ROLLME = new Date().format("yyyyMMddHHmmss", TimeZone.getTimeZone("UTC"))
+
+                    echo "Current Version: ${env.CURRENT_VERSION}"
+                    echo "Rollout Timestamp: ${env.ROLLME}"
+                }
+            }
+        }
+
+        stage('Deploy Target Version via Helm') {
+            steps {
+                script {
+                    def HELM_RELEASE = "${params.APP_NAME}-${params.TARGET_VERSION}"
+
+                    if (params.ACTION == "dry-run") {
+                        sh """
+                            helm template ${HELM_RELEASE} ./xxxx \
+                            -f values.yaml \
+                            --namespace ${params.NAMESPACE} \
+                            --set image.tag=${params.TAG} \
+                            --set version=${params.TARGET_VERSION}
+                        """
+                    }
+
+                    if (params.ACTION == "deploy") {
+                        sh """
+                            helm upgrade ${HELM_RELEASE} ./xxxx \
+                            -f values.yaml \
+                            --namespace ${params.NAMESPACE} \
+                            --set image.tag=${params.TAG} \
+                            --set version=${params.TARGET_VERSION} \
+                            --set rollme=${env.ROLLME} \
+                            --install \
+                            --wait \
+                            --timeout 120s
+                        """
+                    }
+
+                    if (params.ACTION == "uninstall") {
+                        sh """
+                            helm uninstall ${HELM_RELEASE} \
+                            -n ${params.NAMESPACE}
+                        """
+                    }
+                }
+            }
+        }
+
+        // stage('Health Check Target Pods') {
+        //     steps {
+        //         script {
+        //             READY=$(kubectl get deployment king-deployment-${TARGET_VERSION} -n ${NAMESPACE} \
+        //                 -o jsonpath='{.status.readyReplicas}')
+        //             if (!READY || READY.toInteger() == 0) {
+        //                 error "Target deployment Pods are not ready!"
+        //             }
+        //             echo "Target deployment is healthy."
+        //         }
+        //     }
+        // }
+
+        stage('Service switch to Target Version') {
+            when {
+                expression { params.ACTION == "deploy" }
+            }
+            steps {
+                script {
+                    sh """
+                        kubectl patch service ${params.SERVICE_NAME} -n ${params.NAMESPACE} \
+                        -p '{"spec":{"selector":{"app":"${params.APP_NAME}","version":"${params.TARGET_VERSION}"}}}'
+                    """
+                    echo "Service now points to ${params.TARGET_VERSION}."
+                }
+            }
+        }
+    }
+
+    post {
+        cleanup {
+            cleanWs()
+        }
+        failure {
+            echo "Deployment failed, consider rolling back Service selector."
+        }
+    }
+}
