@@ -13,9 +13,14 @@ output "existing_ecs_id" {
   value = module.ecs.instance_id
 }
 
-output "existing_security_group_name" {
-  value = data.alicloud_security_groups.existing.resource_group_id
-}
+# output "existing_security_group_name" {
+#   value = data.alicloud_security_groups.existing.resource_group_id
+# }
+
+
+# output "k8s_sg" {
+#   value = data.alicloud_security_groups.ack.ids[0]
+# }
 
 # output "new_ecs_id" { 
 #   value = alicloud_instance.new_ecs.id

@@ -15,12 +15,12 @@ spec:
         app: nginx-demo
         version: v1.0
       annotations: 
-        rollout-timestamp: "xxxxxxx"
+        rollout-timestamp: "202603102235"
     spec:
       serviceAccountName: king
       containers:
       - name: nginx
-        image: nexus3.xxx.xxx:18080/xxxxxxxx/nginx:1.1.0
+        image: registry.cn-hangzhou.aliyuncs.com/library/nginx:1.25
         workingDir: /tmp
         command:
         - /bin/sh
@@ -32,8 +32,8 @@ spec:
             cpu: 100m
             memory: 128Mi
           limits:
-            cpu: 500m
-            memory: 256Mi
+            cpu: 200m
+            memory: 128Mi
         volumeMounts:
         - name: log-volume
           mountPath: /var/log

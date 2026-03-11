@@ -18,3 +18,9 @@ data "alicloud_ack_service" "open" {
   enable = "On"
   type   = "propayasgo"
 }
+
+data "alicloud_security_groups" "ack" {
+  tags = {
+    "ack.aliyun.com" = "cd5e7b26ed4b640649b61d06dca6839e0"
+  }
+}
